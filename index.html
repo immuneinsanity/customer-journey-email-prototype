@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  PROTOTYPE — THROWAWAY. NOT PRODUCTION CODE.
+  Customer Journey Email Series — Paul Davis Restoration of Downtown Boston
+
+  Question this answers: "What should the 6 customer-journey status emails
+  look like, and how should the flow feel?"
+
+  Play with two axes:
+    - Stage 1..6  (top selector)        -> which journey email
+    - Variant A/B/C (bottom bar / arrows) -> three different email designs
+
+  Toggles:
+    - Edit mock job data (the {{MERGE_FIELDS}} populate live)
+    - "Show RMS field mapping" -> reveals where each value comes from in RMS,
+      plus the trigger type (RMS compliance task vs manual) per stage.
+
+  Data here is FAKE. Real build wires these fields to RMS. Delete when done.
+  ============================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer Journey Emails — Prototype</title>
+<style>
+  :root {
+    /* Black / Gold / White theme (Steelers / Hawkeyes) */
+    --pd-green: #FFB81C;        /* gold accent (fills, buttons, chevrons) */
+    --pd-green-dark: #1a1a1a;   /* near-black: heading text + dark fills */
+    --pd-green-light: #FFF6DE;  /* pale gold tint for callout backgrounds */
+    --gold-deep: #8a6d00;       /* gold dark enough to read as a link on white */
+    --ink: #1a1a1a;
+    --muted: #5c6770;
+    --line: #e3e7ea;
+    --bg: #ececec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding-bottom: 90px;
+  }
+
+  /* ---- Top control rail ---- */
+  .rail {
+    position: sticky; top: 0; z-index: 50;
+    background: #0b0b0c; color: #fff;
+    padding: 10px 16px;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18);
+  }
+  .rail .brand { font-weight: 700; letter-spacing: .2px; margin-right: 6px; }
+  .rail .brand small { font-weight: 400; opacity: .6; display:block; font-size: 11px; }
+  .stage-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .stage-tabs button {
+    background: #1f262c; color: #cfd6db; border: 1px solid #2b343b;
+    border-radius: 7px; padding: 6px 11px; font-size: 12.5px; cursor: pointer;
+    display: flex; flex-direction: column; line-height: 1.15; min-width: 84px;
+  }
+  .stage-tabs button b { color: #8a949b; font-size: 11px; }
+  .stage-tabs button.active { background: var(--pd-green); color: #0b0b0c; border-color: var(--pd-green); }
+  .stage-tabs button.active b { color: #6b5200; }
+  .rail .spacer { flex: 1; }
+  .toggle { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #cfd6db; cursor: pointer; user-select: none; }
+  .toggle input { accent-color: var(--pd-green); width: 15px; height: 15px; }
+
+  /* ---- Layout ---- */
+  .stage-bg-1 { background: var(--bg); }
+  .workarea { display: flex; gap: 22px; align-items: flex-start; max-width: 1180px; margin: 26px auto; padding: 0 20px; }
+  .email-col { flex: 1 1 auto; min-width: 0; }
+  .side-col { flex: 0 0 290px; }
+
+  /* ---- Data / info side panel ---- */
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .panel h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .panel .hint { font-size: 11.5px; color: var(--muted); margin: 0 0 12px; }
+  .field-row { margin-bottom: 9px; }
+  .field-row label { display: block; font-size: 10.5px; color: var(--muted); font-family: ui-monospace, "Cascadia Code", Consolas, monospace; margin-bottom: 2px; }
+  .field-row input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; }
+  .trigger-card { border-left: 4px solid var(--pd-green); background: var(--pd-green-light); padding: 10px 12px; border-radius: 0 8px 8px 0; }
+  .trigger-card .t-type { font-weight: 700; font-size: 13px; }
+  .trigger-card .t-type.manual { color: #b26a00; }
+  .trigger-card .t-type.rms { color: var(--pd-green-dark); }
+  .trigger-card p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
+  .badge { display:inline-block; font-size: 10px; font-weight:700; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; letter-spacing:.5px; }
+  .badge.rms { background: var(--pd-green-light); color: var(--pd-green-dark); }
+  .badge.manual { background: #fbeccd; color: #8a5200; }
+
+  /* ---- The fake email client frame ---- */
+  .mail-frame { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow: 0 6px 24px rgba(20,30,40,.07); }
+  .mail-head { padding: 14px 22px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); background:#fafbfc; }
+  .mail-head .subj { font-size: 16px; color: var(--ink); font-weight: 700; margin-bottom: 8px; }
+  .mail-head .row { display:flex; gap:6px; }
+  .mail-head .row span:first-child { width: 52px; color:#97a1a8; }
+  .mail-body { padding: 0; }
+
+  /* merge-field chip when mapping mode on */
+  .mf { background: #fff3d6; border: 1px dashed #d9a93a; border-radius: 5px; padding: 0 5px; font-family: ui-monospace, Consolas, monospace; font-size: .85em; color: #8a5200; white-space: nowrap; }
+
+  /* ============ VARIANT A — Progress Banner (image hero) ============ */
+  .vA .hero img { width: 100%; display:block; }
+  .vA .body { padding: 26px 40px 34px; font-size: 15px; line-height: 1.62; color:#2b3338; }
+  .vA p { margin: 0 0 15px; }
+  .vA .stagebox { background: var(--pd-green-light); border-radius: 10px; padding: 16px 20px; margin: 22px 0; }
+  .vA .stagebox .lbl { font-size: 11px; text-transform: uppercase; letter-spacing:.7px; color: var(--pd-green-dark); font-weight:700; }
+  .vA .stagebox .stg { font-size: 19px; font-weight: 800; margin: 2px 0 8px; }
+  .vA h4 { font-size: 16px; margin: 24px 0 8px; color: var(--pd-green-dark); }
+  .vA .poc { border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin: 18px 0; }
+  .vA .poc .role { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted);}
+  .vA .poc .name { font-size:17px; font-weight:700; }
+  .vA ul { margin: 8px 0 16px; padding-left: 20px; }
+  .vA li { margin-bottom: 6px; }
+  .vA .quickfav { border-top:1px solid var(--line); margin-top: 24px; padding-top: 18px; font-size: 13.5px; color: var(--muted); }
+  .vA .cta { display:inline-block; background: var(--pd-green); color:#0b0b0c !important; text-decoration:none; padding: 12px 22px; border-radius: 8px; font-weight:700; margin: 6px 0; }
+  .vA .signoff { margin-top: 26px; }
+  .vA .footer { background:#0b0b0c; color:#aeb7bd; padding: 18px 40px; font-size: 12px; }
+  .vA .footer b { color:#fff; }
+
+  /* ============ VARIANT B — Status Dashboard (card / chip) ============ */
+  .vB .body { padding: 0; }
+  .vB .topbar { background: linear-gradient(120deg, #0b0b0c, #333); color:#fff; padding: 24px 36px; border-bottom: 3px solid var(--pd-green); }
+  .vB .topbar .chip { display:inline-block; background: rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.35); border-radius:99px; padding:5px 14px; font-size:12px; font-weight:700; letter-spacing:.4px; }
+  .vB .topbar .stagenum { font-size: 13px; opacity:.85; margin-top:14px; }
+  .vB .topbar .stagename { font-size: 28px; font-weight: 800; line-height:1.1; margin-top:2px; }
+  /* compact inline stepper */
+  .vB .steps { display:flex; gap:0; padding: 18px 36px; border-bottom:1px solid var(--line); }
+  .vB .steps .step { flex:1; text-align:center; position:relative; font-size:10.5px; color:#9aa4ab; }
+  .vB .steps .step .dot { width:14px; height:14px; border-radius:50%; background:#d7dde1; margin: 0 auto 5px; }
+  .vB .steps .step.done .dot { background: var(--pd-green); }
+  .vB .steps .step.current .dot { background: var(--pd-green); box-shadow: 0 0 0 4px var(--pd-green-light); }
+  .vB .steps .step.current { color: var(--pd-green-dark); font-weight:700; }
+  .vB .steps .step::before { content:""; position:absolute; top:7px; left:-50%; width:100%; height:2px; background:#e1e6e9; z-index:0; }
+  .vB .steps .step:first-child::before { display:none; }
+  .vB .steps .step.done::before { background: var(--pd-green); }
+  .vB .grid { display:grid; grid-template-columns: 1fr 230px; gap: 0; }
+  .vB .main { padding: 26px 36px; font-size:14.5px; line-height:1.6; color:#2b3338; }
+  .vB .main p { margin:0 0 14px; }
+  .vB .aside { background:#fafbfc; border-left:1px solid var(--line); padding: 24px 22px; }
+  .vB .aside .card { margin-bottom: 20px; }
+  .vB .aside .k { font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  .vB .aside .v { font-size:15px; font-weight:700; margin-top:2px; }
+  .vB .callout { background: var(--pd-green-light); border-radius:10px; padding:16px 18px; margin: 18px 0; font-size:14px; }
+  .vB .callout .h { font-weight:700; color:var(--pd-green-dark); margin-bottom:6px; }
+  .vB ul { margin:6px 0; padding-left:18px; } .vB li { margin-bottom:5px; }
+  .vB .cta { display:inline-block; background: var(--pd-green); color:#0b0b0c !important; text-decoration:none; padding:11px 20px; border-radius:8px; font-weight:700; }
+  .vB .fav { font-size:12.5px; color:var(--muted); border-top:1px solid var(--line); margin-top:20px; padding-top:14px; }
+  .vB .footer { background:#0b0b0c; color:#aeb7bd; padding:16px 36px; font-size:12px; }
+
+  /* ---- floating variant switcher ---- */
+  .switcher {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: #0b0b0c; color:#fff; border-radius: 99px; padding: 8px 8px;
+    display:flex; align-items:center; gap: 4px; z-index: 100;
+    box-shadow: 0 8px 30px rgba(0,0,0,.35); border: 1px solid #2b343b;
+  }
+  .switcher button { background:#272f36; color:#fff; border:none; width:38px; height:38px; border-radius:50%; font-size:18px; cursor:pointer; }
+  .switcher button:hover { background: var(--pd-green); color:#0b0b0c; }
+  .switcher .vlabel { padding: 0 16px; font-size: 13.5px; min-width: 220px; text-align:center; }
+  .switcher .vlabel b { color: #FFC629; }
+  .switcher .kbd { font-size: 10px; opacity:.5; margin-left:2px; }
+
+  /* ---- image-fail-safe progress strip (Variant A, always renders) ---- */
+  .vA .progress-fallback { padding: 18px 40px 0; }
+  .pf-label { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 7px; letter-spacing:.2px; }
+  .pf-label b { color: var(--gold-deep); }
+  .pf-bar { display:flex; gap:4px; }
+  .pf-bar .seg { flex:1; height:9px; border-radius:5px; background:#e1e6e9; }
+  .pf-bar .seg.done { background: var(--pd-green); }
+  .pf-bar .seg.current { background: var(--pd-green); box-shadow: 0 0 0 2px var(--pd-green-light); }
+  .img-blocked { margin: 14px 40px 0; border:1px dashed #c7ced3; border-radius:8px; background:#f4f6f7; color:#7c868d; font-size:12.5px; padding:13px 15px; display:flex; align-items:center; gap:11px; }
+  .img-blocked .ph { width:30px; height:30px; border-radius:6px; background:#e1e6e9; display:flex; align-items:center; justify-content:center; font-size:15px; flex:0 0 auto; }
+
+  /* ---- paste toolbar above the email ---- */
+  .mailbar { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:9px 14px; margin-bottom:14px; }
+  .mb-subj { flex:1; font-size:13px; color:var(--ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mb-btn { border:1px solid var(--line); background:#fff; border-radius:7px; padding:7px 12px; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .mb-btn.primary { background: var(--pd-green); border-color: var(--pd-green); color:#0b0b0c; font-weight:700; }
+  .mb-btn:hover { filter:brightness(.96); }
+  .mb-status { font-size:12.5px; color: var(--gold-deep); font-weight:700; min-width:54px; }
+
+  /* ---- claim-sync panel ---- */
+  .syncrow { display:flex; gap:6px; margin-bottom:8px; }
+  .syncrow input { flex:1; padding:7px 9px; border:1px solid var(--line); border-radius:6px; font-size:13px; }
+  .syncrow button { background: var(--pd-green); color:#0b0b0c; border:none; border-radius:6px; padding:7px 16px; font-weight:700; cursor:pointer; }
+  .syncrow button:hover { filter:brightness(.96); }
+  .syncstatus { font-size:11.5px; color:var(--muted); margin-bottom:8px; min-height:14px; }
+  .syncstatus.ok { color: var(--gold-deep); font-weight:700; }
+  .rmswarn { background:#fff6de; border:1px solid #e3c66a; border-radius:7px; padding:9px 11px; font-size:11.5px; color:#7a5e00; margin-bottom:12px; line-height:1.4; }
+  .field-row { position:relative; }
+  .field-row input { padding-right:26px; }
+  .fr-x { position:absolute; right:5px; top:21px; border:none; background:transparent; color:#b0b8be; cursor:pointer; font-size:13px; line-height:1; padding:3px 4px; }
+  .fr-x:hover { color:#d23; }
+  .claim-hint { font-size:10.5px; color:#97a1a8; margin-top:-2px; margin-bottom:10px; }
+  .rmsconn { float:right; font-size:10px; font-weight:600; text-transform:none; letter-spacing:0; display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:99px; background:#f0f2f3; color:#5c6770; }
+  .rmsconn .dot { width:8px; height:8px; border-radius:50%; background:#b9c0c5; }
+  .rmsconn.live { background:#eafaef; color:#0a7a33; } .rmsconn.live .dot { background:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.18); }
+  .rmsconn.login { background:#fff6de; color:#7a5e00; } .rmsconn.login .dot { background:#e0a500; }
+  .rmsconn.off { background:#f6ecec; color:#9a4a4a; } .rmsconn.off .dot { background:#cf6b6b; }
+</style>
+</head>
+<body>
+
+<div class="rail">
+  <div class="brand">Paul Davis · Customer Journey<small>Mission Control prototype · claim sync</small></div>
+  <div class="stage-tabs" id="stageTabs"></div>
+  <div class="spacer"></div>
+  <label class="toggle"><input type="checkbox" id="blockToggle"> Simulate images blocked</label>
+  <label class="toggle"><input type="checkbox" id="mapToggle"> Show RMS field mapping</label>
+</div>
+
+<div class="workarea">
+  <div class="email-col">
+    <div class="mailbar">
+      <span class="mb-subj" id="mbSubj"></span>
+      <button id="copyBtn" class="mb-btn primary">📋 Copy email for Outlook</button>
+      <button id="copyTextBtn" class="mb-btn">Plain text</button>
+      <span id="copyStatus" class="mb-status"></span>
+    </div>
+    <div class="mail-frame" id="mailFrame"></div>
+  </div>
+  <div class="side-col">
+    <div class="panel" id="triggerPanel"></div>
+    <div class="panel">
+      <h3>Job data · Sync from RMS <span id="rmsConn" class="rmsconn" title="checking…"><span class="dot"></span><span id="rmsConnText">checking…</span></span></h3>
+      <p class="hint">Enter the full RMS job number (with division letter) and Sync. When RMS is connected you get <b>live RMS data</b>; otherwise demo data. Verify &amp; edit before sending.</p>
+      <div class="syncrow">
+        <input id="claimInput" placeholder="Job # e.g. MBMA-26-0123-R">
+        <button id="syncBtn">Sync</button>
+      </div>
+      <div class="claim-hint">Demo jobs: MBMA-26-0123, MBMA-26-0145</div>
+      <div id="syncStatus" class="syncstatus"></div>
+      <div id="rmsWarn" class="rmswarn" style="display:none">⚠ RMS data is often partly wrong — wrong participants carry over from job shells (e.g. a job shows Carlos when it should be Jared). <b>Verify every name &amp; date before sending.</b> Use ✕ to clear a field that doesn&rsquo;t apply.</div>
+      <div id="dataForm"></div>
+    </div>
+  </div>
+</div>
+
+<div class="switcher">
+  <button id="prevV">‹</button>
+  <div class="vlabel" id="vlabel"></div>
+  <button id="nextV">›</button>
+</div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   MOCK DATA — fake. Maps 1:1 to the merge fields in the Word doc.
+---------------------------------------------------------------------------- */
+const DATA = {
+  HOMEOWNER_NAME: "Sarah Thompson",
+  CUSTOMER_EMAIL: "sarah.thompson@example.com",
+  JOB_ADDRESS: "42 Beacon Street, Boston, MA 02108",
+  COMPANY_PHONE: "(617) 553-3473",
+  COMPANY_ADDRESS: "Paul Davis Restoration of Downtown Boston · Boston, MA",
+  COORDINATOR_NAME: "Mackenzie Corbitt",
+  PROJECT_MANAGER_NAME: "Melvin R.",
+  RECON_DIRECTOR_NAME: "Carlos Samayoa",
+  ESTIMATED_RECON_START_DATE: "July 7, 2026",
+  SCHEDULED_START_DATE: "July 7, 2026",
+  COMPLETION_DATE: "August 15, 2026",
+  GOOGLE_REVIEW_LINK: "https://g.page/r/PaulDavisBoston/review"
+};
+
+const FIELD_SOURCE = {
+  HOMEOWNER_NAME: "RMS · Contact name",
+  CUSTOMER_EMAIL: "RMS · Customer email (Outlook To:)",
+  JOB_ADDRESS: "RMS · Job / loss address",
+  COMPANY_PHONE: "Static · office config",
+  COMPANY_ADDRESS: "Static · office config",
+  COORDINATOR_NAME: "RMS · assigned Coordinator",
+  PROJECT_MANAGER_NAME: "RMS · assigned Project Manager",
+  RECON_DIRECTOR_NAME: "RMS · assigned Recon Director / PM",
+  ESTIMATED_RECON_START_DATE: "Manual / RMS schedule estimate",
+  SCHEDULED_START_DATE: "RMS · confirmed schedule date",
+  COMPLETION_DATE: "RMS · job completion date",
+  GOOGLE_REVIEW_LINK: "Static · review URL"
+};
+
+/* ----------------------------------------------------------------------------
+   STAGES — content transcribed from Customer_Journey_Email_Templates.docx
+---------------------------------------------------------------------------- */
+const STAGES = [
+  {
+    n:1, key:"Mitigation", img:"01 Mitigation.png",
+    trigger:"rms", triggerNote:"Send when mitigation work begins. (RMS cue: Mitigation compliance task.)",
+    subject:"We're Here to Help — Mitigation Work Begins Today",
+    intro:[
+      "Thank you for choosing Paul Davis Restoration of Downtown Boston. We understand how stressful a property damage event can be, and we're here to guide you through every step of the process.",
+      "We're currently in the Mitigation phase—our team is working to stabilize your property, prevent further damage, and document everything for your insurance claim."
+    ],
+    whats:"Emergency stabilization, damage assessment, water extraction, drying",
+    pocRole:"Mitigation Coordinator", pocName:"{{COORDINATOR_NAME}}",
+    talk:"Don't hesitate to call {{COMPANY_PHONE}}. Our team is here to answer questions and ensure you're comfortable every step of the way.",
+    closing:"We're in this together.",
+    signoff:"Best regards,\nPaul Davis Restoration of Downtown Boston",
+    review:"light-google"
+  },
+  {
+    n:2, key:"Recon Scoping", img:"02 Recon Scoping.png",
+    trigger:"rms", triggerNote:"Send when recon scoping starts — mitigation substantially complete. (RMS cue: Recon Scoping compliance task.)",
+    subject:"Next Step: Recon Scoping for Your Property",
+    intro:[
+      "Great progress! The mitigation phase is complete, and we're moving into the next critical stage: Recon Scoping. Our team is now carefully documenting all damage for your insurance estimate.",
+      "This phase ensures we capture every detail so your reconstruction plan is accurate and complete."
+    ],
+    whats:"Detailed property inspection, sketch creation, damage documentation",
+    pocRole:"Project Manager", pocName:"{{PROJECT_MANAGER_NAME}}",
+    talk:"If you have questions during scoping or want an update, reach out to {{PROJECT_MANAGER_NAME}} at {{COMPANY_PHONE}}.",
+    closing:"Thank you for your patience.",
+    signoff:"Best regards,\nPaul Davis Restoration of Downtown Boston",
+    review:"light"
+  },
+  {
+    n:3, key:"Recon Estimating", img:"03 Recon Estimating.png",
+    trigger:"manual", triggerNote:"Send when scoping moves into detailed estimating. Judgment call — this step doesn't map cleanly to an RMS task.",
+    subject:"Your Detailed Reconstruction Estimate is Being Prepared",
+    intro:[
+      "We've completed our initial scoping, and now our estimating team is building a detailed, line-by-line reconstruction estimate. This estimate forms the foundation of your insurance claim and guides the entire reconstruction process.",
+      "We're committed to accuracy and transparency—every item is accounted for."
+    ],
+    whats:"Line-by-line damage estimate, material pricing, labor calculations",
+    pocRole:"Project Manager", pocName:"{{PROJECT_MANAGER_NAME}}",
+    talk:"Questions about the estimate or next steps? Call {{PROJECT_MANAGER_NAME}} at {{COMPANY_PHONE}}.",
+    closing:"We're on it.",
+    signoff:"Best regards,\nPaul Davis Restoration of Downtown Boston",
+    review:"light"
+  },
+  {
+    n:4, key:"Adjuster Approval", img:"04 Adjuster Approval.png",
+    trigger:"rms", triggerNote:"Send when the estimate is submitted to the adjuster. This is the GAP email that manages the 1–3 week quiet period.",
+    subject:"Your Estimate Submitted — What Happens Next",
+    intro:[
+      "Your detailed reconstruction estimate has been completed and submitted to your insurance adjuster. This is an important milestone—we're now waiting for the adjuster's review and approval before reconstruction work can begin.",
+      "We know this can feel like a quiet period, but a lot is happening behind the scenes on your behalf."
+    ],
+    whats:"Insurance review of estimate, potential scope negotiations, permit applications",
+    behindScenes:[
+      "Communicating with your insurance adjuster about the estimate",
+      "Managing permit applications and local requirements",
+      "Coordinating with specialty contractors and suppliers",
+      "Scheduling and logistics planning for reconstruction",
+      "Ensuring every detail is perfect before we begin"
+    ],
+    timeline:"Adjuster approval typically takes 1–3 weeks, depending on your insurance company and the scope of work. You can expect to see us return and begin reconstruction work around {{ESTIMATED_RECON_START_DATE}}. We'll notify you as soon as we receive approval.",
+    pocRole:"Reconstruction Director", pocName:"{{RECON_DIRECTOR_NAME}}",
+    talk:"If the waiting feels uncertain, that's completely normal. Don't hesitate to reach out—we're happy to give you a quick call to walk through what's happening and answer any questions. Call {{COMPANY_PHONE}} and ask for {{RECON_DIRECTOR_NAME}}.",
+    closing:"We've got your back.",
+    signoff:"Best regards,\nPaul Davis Restoration of Downtown Boston",
+    review:"light"
+  },
+  {
+    n:5, key:"Contract & Deposits", img:"05 Contracts & Deposits.png",
+    trigger:"rms", triggerNote:"Send when adjuster approval is received and the contract is ready for execution.",
+    subject:"Adjuster Approved! Reconstruction Begins Soon",
+    intro:[
+      "Excellent news! Your insurance adjuster has approved the reconstruction estimate, and we're ready to move forward. We've prepared your contract and are scheduling your reconstruction project to begin on {{SCHEDULED_START_DATE}}.",
+      "We're excited to return and make your home whole again."
+    ],
+    whats:"Contract execution, deposit collection, final scheduling, crew assignment",
+    nextSteps:"We'll be reaching out to finalize contract details and discuss any questions you may have. Your reconstruction crew will be assigned, and we'll lock in your start date and daily schedule.",
+    pocRole:"Reconstruction Director", pocName:"{{RECON_DIRECTOR_NAME}}",
+    talk:"Call {{RECON_DIRECTOR_NAME}} at {{COMPANY_PHONE}} to discuss timing, answer questions, or finalize any details.",
+    closing:"Let's rebuild.",
+    signoff:"Best regards,\nPaul Davis Restoration of Downtown Boston",
+    review:"light"
+  },
+  {
+    n:6, key:"Reconstruction", img:"06 Reconstruction Started.png",
+    trigger:"rms", triggerNote:"Send when reconstruction is substantially complete / the job is closed. The strong Google-review ask lives here.",
+    subject:"Your Home is Restored — Thank You!",
+    intro:[
+      "We're thrilled to share that your reconstruction project is now complete! Our team has worked diligently to restore your property to its pre-loss condition. Thank you for trusting Paul Davis Restoration of Downtown Boston to bring your home back.",
+      "We genuinely hope we've earned a 5-star experience from you."
+    ],
+    summary:[
+      ["Property","{{JOB_ADDRESS}}"],
+      ["Project Completion Date","{{COMPLETION_DATE}}"],
+      ["Lead Coordinator","{{RECON_DIRECTOR_NAME}}"]
+    ],
+    pocRole:"Reconstruction Director", pocName:"{{RECON_DIRECTOR_NAME}}",
+    talk:"If you notice anything that needs attention or have any questions, please don't hesitate to call {{RECON_DIRECTOR_NAME}} at {{COMPANY_PHONE}}. We want to make sure you're 100% satisfied.",
+    finalWord:"We know the restoration process isn't easy, and we're grateful for your patience and trust. Our mission is to turn damage into opportunity—to restore not just your home, but your peace of mind. We hope we've delivered on that promise. Thank you. We're honored to have been part of rebuilding your home.",
+    closing:"",
+    signoff:"Warmly,\nThe Paul Davis Restoration of Downtown Boston Team",
+    review:"strong-google"
+  }
+];
+
+const VARIANTS = {
+  A: "Progress Banner (image hero)",
+  B: "Status Dashboard (card layout)"
+};
+
+/* ---- state ---- */
+let curStage = 1;
+let curVariant = "A";
+let showMap = false;
+let blockImages = false;
+
+/* ---- merge-field substitution ---- */
+function fill(text){
+  if(text == null) return "";
+  return text.replace(/\{\{([A-Z_]+)\}\}/g, (m, k) => {
+    if(showMap){
+      const src = FIELD_SOURCE[k] ? " · " + FIELD_SOURCE[k] : "";
+      return '<span class="mf" title="'+ (FIELD_SOURCE[k]||"") +'">{{'+k+'}}</span>';
+    }
+    return DATA[k] !== undefined ? DATA[k] : m;
+  });
+}
+const reviewLight = "We strive to deliver a 5-star experience. If at any time during this process you feel like you're not receiving exceptional service, please call us immediately so we can make it right.";
+const reviewLightGoogle = reviewLight + " And if we do earn it—we'd love a 5-star review on Google!";
+
+/* ============================ RENDERERS ============================ */
+function renderVariantA(s){
+  let h = '';
+  h += '<div class="mail-head"><div class="subj">'+fill(s.subject)+'</div>';
+  h += '<div class="row"><span>From</span><span>Paul Davis Restoration &lt;updates@pauldavisboston.com&gt;</span></div>';
+  h += '<div class="row"><span>To</span><span>'+fill("{{HOMEOWNER_NAME}}")+' &lt;'+fill("{{CUSTOMER_EMAIL}}")+'&gt;</span></div></div>';
+  h += '<div class="mail-body vA">';
+  // image-fail-safe progress strip — communicates position even with images stripped
+  h += '<div class="progress-fallback"><div class="pf-label">Step '+s.n+' of 6 · <b>'+s.key+'</b></div><div class="pf-bar">';
+  STAGES.forEach(st=>{ let c = st.n<s.n?'done':(st.n===s.n?'current':''); h += '<span class="seg '+c+'"></span>'; });
+  h += '</div></div>';
+  if(blockImages){
+    h += '<div class="img-blocked"><span class="ph">&#128247;</span><span><b>[Progress graphic hidden]</b> — many inboxes block images. The bar above still tells the homeowner exactly where they are.</span></div>';
+  } else {
+    h += '<div class="hero"><img src="'+encodeURI('gold/'+s.img)+'" alt="Loss Claim Progress — Step '+s.n+' of 6: '+s.key+'"></div>';
+  }
+  h += '<div class="body">';
+  h += '<p>Hi '+fill("{{HOMEOWNER_NAME}}")+',</p>';
+  s.intro.forEach(p=> h += '<p>'+fill(p)+'</p>');
+  h += '<div class="stagebox"><div class="lbl">Current Stage</div><div class="stg">'+s.key+'</div>';
+  h += '<div><b>What\'s happening:</b> '+fill(s.whats)+'</div></div>';
+
+  if(s.behindScenes){
+    h += '<h4>What\'s Happening Behind the Scenes?</h4><ul>';
+    s.behindScenes.forEach(li=> h+='<li>'+fill(li)+'</li>'); h+='</ul>';
+    h += '<h4>Typical Timeline</h4><p>'+fill(s.timeline)+'</p>';
+  }
+  if(s.nextSteps){ h += '<h4>Next Steps</h4><p>'+fill(s.nextSteps)+'</p>'; }
+  if(s.summary){
+    h += '<h4>Project Summary</h4>';
+    s.summary.forEach(kv=> h += '<p style="margin:2px 0"><b>'+kv[0]+':</b> '+fill(kv[1])+'</p>');
+  }
+
+  h += '<div class="poc"><div class="role">Your Point of Contact · '+s.pocRole+'</div><div class="name">'+fill(s.pocName)+'</div><div>'+fill("{{COMPANY_PHONE}}")+'</div></div>';
+  h += '<p>'+fill(s.talk)+'</p>';
+
+  if(s.review==='strong-google'){
+    h += '<h4>We\'d Love Your Feedback</h4><p>If your experience with Paul Davis Restoration of Downtown Boston was exceptional, we\'d be incredibly grateful if you\'d take a moment to leave us a 5-star review on Google.</p>';
+    h += '<a class="cta" href="#">Leave a 5-Star Google Review</a>';
+    h += '<p style="font-size:12px;color:#8a949b">'+fill("{{GOOGLE_REVIEW_LINK}}")+'</p>';
+    h += '<h4>A Final Word</h4><p>'+fill(s.finalWord)+'</p>';
+  } else {
+    h += '<div class="quickfav"><b>A quick favor:</b> '+ (s.review==='light-google'?reviewLightGoogle:reviewLight) +'</div>';
+  }
+  if(s.closing) h += '<p class="signoff">'+fill(s.closing)+'</p>';
+  h += '<p>'+fill(s.signoff).replace(/\n/g,'<br>')+'</p>';
+  h += '</div>'; // body
+  h += '<div class="footer"><b>Paul Davis Restoration of Downtown Boston</b><br>'+fill("{{COMPANY_PHONE}}")+' · '+fill("{{COMPANY_ADDRESS}}")+'</div>';
+  h += '</div>';
+  return h;
+}
+
+function renderStepper(curN){
+  let h = '<div class="steps">';
+  STAGES.forEach(st=>{
+    let cls = st.n < curN ? 'done' : (st.n===curN ? 'current' : '');
+    h += '<div class="step '+cls+'"><div class="dot"></div>'+st.key+'</div>';
+  });
+  return h + '</div>';
+}
+
+function renderVariantB(s){
+  let h = '';
+  h += '<div class="mail-head"><div class="subj">'+fill(s.subject)+'</div>';
+  h += '<div class="row"><span>To</span><span>'+fill("{{HOMEOWNER_NAME}}")+' &lt;'+fill("{{CUSTOMER_EMAIL}}")+'&gt;</span></div></div>';
+  h += '<div class="mail-body vB">';
+  h += '<div class="topbar"><span class="chip">Step '+s.n+' of 6</span><div class="stagenum">Current stage</div><div class="stagename">'+s.key+'</div></div>';
+  h += renderStepper(s.n);
+  h += '<div class="grid"><div class="main">';
+  h += '<p>Hi '+fill("{{HOMEOWNER_NAME}}")+',</p>';
+  s.intro.forEach(p=> h += '<p>'+fill(p)+'</p>');
+  h += '<div class="callout"><div class="h">What\'s happening now</div>'+fill(s.whats)+'</div>';
+
+  if(s.behindScenes){
+    h += '<div class="callout"><div class="h">Behind the scenes</div><ul>';
+    s.behindScenes.forEach(li=> h+='<li>'+fill(li)+'</li>'); h+='</ul></div>';
+    h += '<p><b>Typical timeline.</b> '+fill(s.timeline)+'</p>';
+  }
+  if(s.nextSteps){ h += '<p><b>Next steps.</b> '+fill(s.nextSteps)+'</p>'; }
+  h += '<p>'+fill(s.talk)+'</p>';
+  if(s.review==='strong-google'){
+    h += '<a class="cta" href="#">Leave a 5-Star Google Review</a>';
+    h += '<p style="margin-top:16px">'+fill(s.finalWord)+'</p>';
+  } else {
+    h += '<div class="fav"><b>A quick favor:</b> '+(s.review==='light-google'?reviewLightGoogle:reviewLight)+'</div>';
+  }
+  if(s.closing) h += '<p style="margin-top:14px">'+fill(s.closing)+'</p>';
+  h += '<p>'+fill(s.signoff).replace(/\n/g,'<br>')+'</p>';
+  h += '</div>'; // main
+
+  // aside
+  h += '<div class="aside">';
+  h += '<div class="card"><div class="k">Your point of contact</div><div class="v">'+fill(s.pocName)+'</div><div style="font-size:12px;color:#5c6770">'+s.pocRole+'</div></div>';
+  h += '<div class="card"><div class="k">Call us</div><div class="v">'+fill("{{COMPANY_PHONE}}")+'</div></div>';
+  if(s.summary){ s.summary.forEach(kv=> h += '<div class="card"><div class="k">'+kv[0]+'</div><div class="v" style="font-size:13px">'+fill(kv[1])+'</div></div>'); }
+  h += '</div></div>'; // aside + grid
+  h += '<div class="footer">Paul Davis Restoration of Downtown Boston · '+fill("{{COMPANY_ADDRESS}}")+'</div>';
+  h += '</div>';
+  return h;
+}
+
+/* Variant C (Minimal Letter) removed per build spec (Matt: too plain). Kept A + B. */
+
+/* ============================ WIRING ============================ */
+function render(){
+  const s = STAGES.find(x=>x.n===curStage);
+  const frame = document.getElementById('mailFrame');
+  frame.className = 'mail-frame';
+  if(curVariant==='A') frame.innerHTML = renderVariantA(s);
+  if(curVariant==='B') frame.innerHTML = renderVariantB(s);
+  // Variant C (Minimal Letter) dropped per build spec — Matt: "C is pretty too plain."
+
+  // paste toolbar: subject (subjects contain no merge fields)
+  document.getElementById('mbSubj').textContent = 'Subject: ' + s.subject;
+
+  // stage tabs
+  document.querySelectorAll('#stageTabs button').forEach(b=>{
+    b.classList.toggle('active', +b.dataset.n===curStage);
+  });
+  // when-to-send panel — all sends are MANUAL for now (copy → Outlook); automation parked per build spec
+  const tp = document.getElementById('triggerPanel');
+  tp.innerHTML = '<h3>Email #'+s.n+' · when to send</h3>'+
+    '<div class="trigger-card"><div class="t-type manual">Manual — copy &amp; send via Outlook <span class="badge manual">For now</span></div>'+
+    '<p>'+s.triggerNote+'</p>'+
+    '<p style="margin-top:6px;color:#97a1a8">Automatic firing is parked until the manual flow proves out.</p></div>';
+
+  // variant label
+  document.getElementById('vlabel').innerHTML = '<b>'+curVariant+'</b> — '+VARIANTS[curVariant];
+}
+
+function buildStageTabs(){
+  const c = document.getElementById('stageTabs');
+  STAGES.forEach(s=>{
+    const b = document.createElement('button');
+    b.dataset.n = s.n;
+    b.innerHTML = '<b>0'+s.n+'</b>'+s.key;
+    b.onclick = ()=>{ curStage=s.n; render(); };
+    c.appendChild(b);
+  });
+}
+function buildDataForm(){
+  const c = document.getElementById('dataForm');
+  c.innerHTML = '';
+  Object.keys(DATA).forEach(k=>{
+    const row = document.createElement('div'); row.className='field-row';
+    const lab = document.createElement('label'); lab.textContent='{{'+k+'}}';
+    const inp = document.createElement('input'); inp.value = DATA[k];
+    inp.oninput = ()=>{ DATA[k]=inp.value; render(); };
+    const x = document.createElement('button'); x.className='fr-x'; x.textContent='✕';
+    x.title='Clear / omit this field'; x.type='button';
+    x.onclick = ()=>{ DATA[k]=''; inp.value=''; render(); };
+    row.appendChild(lab); row.appendChild(inp); row.appendChild(x); c.appendChild(row);
+  });
+}
+function cycleVariant(dir){
+  const keys = Object.keys(VARIANTS);
+  let i = keys.indexOf(curVariant);
+  i = (i + dir + keys.length) % keys.length;
+  curVariant = keys[i]; render();
+}
+
+/* ---- fake RMS claim records (stand-in until the real Mission Control sync) ---- */
+const CLAIMS = {
+  "MBMA-26-0123": { HOMEOWNER_NAME:"Sarah Thompson", CUSTOMER_EMAIL:"sarah.thompson@example.com", JOB_ADDRESS:"42 Beacon Street, Boston, MA 02108",
+    COORDINATOR_NAME:"Mackenzie Corbitt", PROJECT_MANAGER_NAME:"Melvin R.",
+    RECON_DIRECTOR_NAME:"Carlos Samayoa", ESTIMATED_RECON_START_DATE:"July 7, 2026",
+    SCHEDULED_START_DATE:"July 7, 2026", COMPLETION_DATE:"August 15, 2026" },
+  "MBMA-26-0145": { HOMEOWNER_NAME:"David & Maria Lopez", CUSTOMER_EMAIL:"dlopez118@example.com", JOB_ADDRESS:"118 Hanover Street, Boston, MA 02113",
+    COORDINATOR_NAME:"Mackenzie Corbitt", PROJECT_MANAGER_NAME:"Carlos C.",
+    RECON_DIRECTOR_NAME:"Carlos Samayoa", ESTIMATED_RECON_START_DATE:"July 21, 2026",
+    SCHEDULED_START_DATE:"July 21, 2026", COMPLETION_DATE:"September 2, 2026" }
+};
+const CLAIM_FIELDS = ["HOMEOWNER_NAME","CUSTOMER_EMAIL","JOB_ADDRESS","COORDINATOR_NAME","PROJECT_MANAGER_NAME",
+  "RECON_DIRECTOR_NAME","ESTIMATED_RECON_START_DATE","SCHEDULED_START_DATE","COMPLETION_DATE"];
+
+const HELPER_BASE = 'http://localhost:8787'; // rms-sync-helper (local only; public page falls back to demo)
+
+async function doSync(){
+  const inp = document.getElementById('claimInput');
+  const status = document.getElementById('syncStatus');
+  const warn = document.getElementById('rmsWarn');
+  const no = (inp.value||'').trim().toUpperCase();
+  if(!no){ status.className='syncstatus'; status.textContent='Enter a job number first.'; return; }
+
+  // 1) try the live RMS helper on localhost
+  status.className='syncstatus'; status.textContent='Syncing… (checking local RMS helper)';
+  let live = null;
+  try {
+    const h = await fetch(HELPER_BASE+'/health', {signal: AbortSignal.timeout(1500)});
+    if(h.ok){
+      status.textContent = 'Helper found — pulling '+no+' from RMS… (can take ~15s)';
+      const r = await fetch(HELPER_BASE+'/job/'+encodeURIComponent(no), {signal: AbortSignal.timeout(120000)});
+      if(r.ok){
+        const j = await r.json();
+        if(j && j.ok) live = j;
+        else { status.className='syncstatus'; status.textContent='RMS: '+(j && j.error ? j.error : 'sync failed'); warn.style.display='block'; return; }
+      }
+    }
+  } catch(e){ /* helper not running — fall through to demo */ }
+
+  if(live){
+    CLAIM_FIELDS.forEach(k=> DATA[k] = live.fields[k] !== undefined ? live.fields[k] : DATA[k]);
+    // blank anything RMS didn't supply rather than keeping stale demo values
+    ["ESTIMATED_RECON_START_DATE","SCHEDULED_START_DATE","COMPLETION_DATE"].forEach(k=>{ if(live.fields[k]===undefined) DATA[k]=''; });
+    status.className='syncstatus ok';
+    status.textContent='✓ LIVE RMS · '+live.jobNumber+' — '+(live.fields.HOMEOWNER_NAME||'?');
+  } else {
+    const rec = CLAIMS[no];
+    if(rec){
+      Object.assign(DATA, rec);
+      status.className='syncstatus ok'; status.textContent='✓ Demo data · '+no+' — '+rec.HOMEOWNER_NAME+' (helper not running)';
+    } else {
+      CLAIM_FIELDS.forEach(k=> DATA[k]='');  // unknown job → blank shell, mirrors missing/partial RMS data
+      status.className='syncstatus'; status.textContent='No demo job for '+no+' and the local RMS helper isn’t running. Blank shell loaded.';
+    }
+  }
+  warn.style.display='block';
+  buildDataForm(); render();
+}
+
+/* ---- copy the rendered email for pasting into Outlook ---- */
+const PAGES_BASE = "https://immuneinsanity.github.io/customer-journey-email-prototype/";
+function copyEmail(mode){
+  const body = document.querySelector('#mailFrame .mail-body');
+  const status = document.getElementById('copyStatus');
+  if(!body) return;
+  const clone = body.cloneNode(true);
+  clone.querySelectorAll('img').forEach(img=>{      // make image paths absolute so they survive the paste
+    const src = img.getAttribute('src')||'';
+    if(!/^https?:/i.test(src)) img.setAttribute('src', PAGES_BASE + src);
+  });
+  const html = clone.innerHTML;
+  const text = (clone.innerText||clone.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
+  const done = ()=>{ status.textContent='Copied ✓'; setTimeout(()=>status.textContent='',2000); };
+  if(mode==='html' && navigator.clipboard && window.ClipboardItem){
+    const item = new ClipboardItem({
+      'text/html': new Blob([html],{type:'text/html'}),
+      'text/plain': new Blob([text],{type:'text/plain'})
+    });
+    navigator.clipboard.write([item]).then(done).catch(()=>fallbackCopy(text,done));
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+  } else { fallbackCopy(text,done); }
+}
+function fallbackCopy(text,done){
+  const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta); done();
+}
+
+document.getElementById('prevV').onclick = ()=>cycleVariant(-1);
+document.getElementById('nextV').onclick = ()=>cycleVariant(1);
+document.getElementById('mapToggle').onchange = (e)=>{ showMap = e.target.checked; render(); };
+document.getElementById('blockToggle').onchange = (e)=>{ blockImages = e.target.checked; render(); };
+document.getElementById('syncBtn').onclick = doSync;
+document.getElementById('claimInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doSync(); });
+
+/* live RMS connection indicator — pings the local helper's /health on a timer */
+async function pingRms(){
+  const el = document.getElementById('rmsConn'), txt = document.getElementById('rmsConnText');
+  if(!el) return;
+  try{
+    const r = await fetch(HELPER_BASE+'/health', {signal: AbortSignal.timeout(1500)});
+    const j = await r.json();
+    if(j && j.ok && j.loggedIn){ el.className='rmsconn live'; txt.textContent='RMS connected'; el.title='Live RMS data available'; }
+    else if(j && j.ok){ el.className='rmsconn login'; txt.textContent='RMS: log in'; el.title='Helper running, but RMS needs login — press Sync to open the login window'; }
+    else throw 0;
+  }catch(e){
+    el.className='rmsconn off'; txt.textContent='RMS offline · demo'; el.title='Local RMS helper not reachable — Sync will use demo data';
+  }
+}
+pingRms(); setInterval(pingRms, 5000);
+document.getElementById('copyBtn').onclick = ()=>copyEmail('html');
+document.getElementById('copyTextBtn').onclick = ()=>copyEmail('text');
+document.addEventListener('keydown', e=>{
+  const t = e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA') return;
+  if(e.key==='ArrowLeft') cycleVariant(-1);
+  if(e.key==='ArrowRight') cycleVariant(1);
+  if(e.key>='1' && e.key<='6'){ curStage=+e.key; render(); }
+});
+
+buildStageTabs();
+buildDataForm();
+render();
+// soft-init: prototype opens on a "synced" job so the email is populated immediately
+document.getElementById('claimInput').value = 'MBMA-26-0123';
+document.getElementById('rmsWarn').style.display = 'block';
+(function(){ const ss=document.getElementById('syncStatus'); ss.className='syncstatus ok'; ss.textContent='✓ Synced job MBMA-26-0123 — Sarah Thompson'; })();
+</script>
+</body>
+</html>
